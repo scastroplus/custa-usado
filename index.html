@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Custa Usado — Preço médio de celulares usados</title>
 <style>
-*{box-sizing:border-box}body{font-family:system-ui,sans-serif;margin:0;background:#0f172a;color:#e2e8f0}header{padding:32px 16px;text-align:center}h1{margin:0 0 8px;font-size:28px}p.sub{margin:0;color:#94a3b8}.wrap{max-width:900px;margin:0 auto;padding:0 16px 48px}input{width:100%;padding:14px 16px;border-radius:12px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;font-size:16px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-top:24px}.card{background:#1e293b;border:1px solid #334155;border-radius:16px;padding:20px}.card h3{margin:0 0 4px;font-size:17px}.card .var{color:#94a3b8;font-size:14px;margin-bottom:12px}.price{font-size:26px;font-weight:700;color:#4ade80}.range{color:#94a3b8;font-size:14px;margin-top:4px}.meta{margin-top:12px;font-size:12px;color:#64748b}.badge{display:inline-block;padding:2px 8px;border-radius:999px;background:#334155;font-size:12px}.empty{color:#94a3b8;text-align:center;margin-top:40px}
+*{box-sizing:border-box}body{font-family:system-ui,sans-serif;margin:0;background:#0f172a;color:#e2e8f0}header{padding:32px 16px;text-align:center}h1{margin:0 0 8px;font-size:28px}p.sub{margin:0;color:#94a3b8}.wrap{max-width:900px;margin:0 auto;padding:0 16px 48px}input{width:100%;padding:14px 16px;border-radius:12px;border:1px solid #334155;background:#1e293b;color:#e2e8f0;font-size:16px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-top:24px}.card{background:#1e293b;border:1px solid #334155;border-radius:16px;padding:20px}.card h3{margin:0 0 4px;font-size:17px}.card .var{color:#94a3b8;font-size:14px;margin-bottom:12px}.price{font-size:26px;font-weight:700;color:#4ade80}.range{color:#94a3b8;font-size:14px;margin-top:4px}.meta{margin-top:12px;font-size:12px;color:#64748b}.badge{display:inline-block;padding:2px 8px;border-radius:999px;background:#334155;font-size:12px}.empty{color:#94a3b8;text-align:center;margin-top:40px}.err{color:#f87171;text-align:center;margin-top:40px;white-space:pre-wrap}
 </style>
 </head>
 <body>
@@ -17,23 +17,30 @@
 </div>
 <script>
 const SUPABASE_URL='https://zoikvfhqhbwkbrpaevru.supabase.co';
-const KEY='sb_publishable_GO0hIkq2JUZTp2X0o6WRyQ_Oiihxczb';
+const KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpvaWt2ZmhxaGJ3a2JycGFldnJ1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIzMDYxNDcsImV4cCI6MjEwNzg4MjE0N30.rTbru1_NYr7nhbyKBq2S_dYMWZjhPq5CaBNeS7UFPd8';
 const H={apikey:KEY,Authorization:'Bearer '+KEY};
 let items=[];
+async function getJSON(url){
+ const r=await fetch(url,{headers:H});
+ const j=await r.json();
+ if(!Array.isArray(j)){throw new Error('Supabase respondeu: '+JSON.stringify(j));}
+ return j;
+}
 async function load(){
  try{
-  const [avRes,prRes]=await Promise.all([
-   fetch(SUPABASE_URL+'/rest/v1/avaliacoes?select=*&order=calculado_em.desc',{headers:H}),
-   fetch(SUPABASE_URL+'/rest/v1/produtos?select=*',{headers:H})
+  const [avs,prods]=await Promise.all([
+   getJSON(SUPABASE_URL+'/rest/v1/avaliacoes?select=*&order=calculado_em.desc'),
+   getJSON(SUPABASE_URL+'/rest/v1/produtos?select=*')
   ]);
-  const avs=await avRes.json();
-  const prods=await prRes.json();
   const byId={};prods.forEach(p=>byId[p.id]=p);
   const seen={};
   items=avs.filter(a=>{if(seen[a.produto_id])return false;seen[a.produto_id]=1;return byId[a.produto_id];}).map(a=>({...a,produto:byId[a.produto_id]}));
   render('');
  }catch(e){
-  document.getElementById('empty').textContent='Erro ao carregar preços: '+e.message;
+  const empty=document.getElementById('empty');
+  empty.className='err';
+  empty.style.display='block';
+  empty.textContent='Erro ao carregar preços: '+e.message;
  }
 }
 function render(q){
@@ -43,7 +50,7 @@ function render(q){
  grid.innerHTML=list.map(a=>`<div class="card"><h3>${a.produto.marca} ${a.produto.modelo}</h3><div class="var">${a.produto.variante} · <span class="badge">confiança ${a.confianca}</span></div><div class="price">R$ ${Number(a.mediana).toLocaleString('pt-BR',{minimumFractionDigits:2})}</div><div class="range">Faixa: R$ ${Number(a.faixa_min).toLocaleString('pt-BR')} – R$ ${Number(a.faixa_max).toLocaleString('pt-BR')}</div><div class="meta">Baseado em ${a.quantidade_ofertas} ofertas · atualizado em ${new Date(a.calculado_em).toLocaleDateString('pt-BR')}</div></div>`).join('');
  const empty=document.getElementById('empty');
  empty.style.display=list.length?'none':'block';
- if(!list.length)empty.textContent='Nenhum modelo com preço coletado ainda.';
+ if(!list.length){empty.className='empty';empty.textContent='Nenhum modelo com preço coletado ainda.';}
 }
 document.getElementById('q').addEventListener('input',e=>render(e.target.value));
 load();
