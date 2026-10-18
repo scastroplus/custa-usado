@@ -18,21 +18,32 @@
 <script>
 const SUPABASE_URL='https://zoikvfhqhbwkbrpaevru.supabase.co';
 const KEY='sb_publishable_GO0hIkq2JUZTp2X0o6WRyQ_Oiihxczb';
+const H={apikey:KEY,Authorization:'Bearer '+KEY};
 let items=[];
 async function load(){
- const r=await fetch(SUPABASE_URL+'/rest/v1/avaliacoes?select=*,produtos!inner(*)&order=calculado_em.desc',{headers:{apikey:KEY,Authorization:'Bearer '+KEY}});
- const data=await r.json();
- const seen={};
- items=data.filter(a=>{if(seen[a.produto_id])return false;seen[a.produto_id]=1;return true;});
- render('');
+ try{
+  const [avRes,prRes]=await Promise.all([
+   fetch(SUPABASE_URL+'/rest/v1/avaliacoes?select=*&order=calculado_em.desc',{headers:H}),
+   fetch(SUPABASE_URL+'/rest/v1/produtos?select=*',{headers:H})
+  ]);
+  const avs=await avRes.json();
+  const prods=await prRes.json();
+  const byId={};prods.forEach(p=>byId[p.id]=p);
+  const seen={};
+  items=avs.filter(a=>{if(seen[a.produto_id])return false;seen[a.produto_id]=1;return byId[a.produto_id];}).map(a=>({...a,produto:byId[a.produto_id]}));
+  render('');
+ }catch(e){
+  document.getElementById('empty').textContent='Erro ao carregar preços: '+e.message;
+ }
 }
 function render(q){
  const grid=document.getElementById('grid');
  const t=q.trim().toLowerCase();
- const list=items.filter(a=>(a.produtos.marca+' '+a.produtos.modelo+' '+a.produtos.variante).toLowerCase().includes(t));
- grid.innerHTML=list.map(a=>`<div class="card"><h3>${a.produtos.marca} ${a.produtos.modelo}</h3><div class="var">${a.produtos.variante} · <span class="badge">${a.confianca==='media'?'confiança média':a.confianca}</span></div><div class="price">R$ ${Number(a.mediana).toLocaleString('pt-BR',{minimumFractionDigits:2})}</div><div class="range">Faixa: R$ ${Number(a.faixa_min).toLocaleString('pt-BR')} – R$ ${Number(a.faixa_max).toLocaleString('pt-BR')}</div><div class="meta">Baseado em ${a.quantidade_ofertas} ofertas · atualizado em ${new Date(a.calculado_em).toLocaleDateString('pt-BR')}</div></div>`).join('');
- document.getElementById('empty').style.display=list.length?'none':'block';
- if(!list.length)document.getElementById('empty').textContent='Nenhum modelo com preço coletado ainda.';
+ const list=items.filter(a=>(a.produto.marca+' '+a.produto.modelo+' '+a.produto.variante).toLowerCase().includes(t));
+ grid.innerHTML=list.map(a=>`<div class="card"><h3>${a.produto.marca} ${a.produto.modelo}</h3><div class="var">${a.produto.variante} · <span class="badge">confiança ${a.confianca}</span></div><div class="price">R$ ${Number(a.mediana).toLocaleString('pt-BR',{minimumFractionDigits:2})}</div><div class="range">Faixa: R$ ${Number(a.faixa_min).toLocaleString('pt-BR')} – R$ ${Number(a.faixa_max).toLocaleString('pt-BR')}</div><div class="meta">Baseado em ${a.quantidade_ofertas} ofertas · atualizado em ${new Date(a.calculado_em).toLocaleDateString('pt-BR')}</div></div>`).join('');
+ const empty=document.getElementById('empty');
+ empty.style.display=list.length?'none':'block';
+ if(!list.length)empty.textContent='Nenhum modelo com preço coletado ainda.';
 }
 document.getElementById('q').addEventListener('input',e=>render(e.target.value));
 load();
